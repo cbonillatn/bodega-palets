@@ -180,6 +180,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('scan',this)">Palets</button>
     <button class="tab" onclick="switchTab('historial',this)">Historial</button>
+    <button class="tab" onclick="switchTab('buscar',this)">Buscar</button>
     <button class="tab" onclick="switchTab('bodegas',this)">Bodegas</button>
     <button class="tab" onclick="switchTab('qrgen',this)">QR</button>
     <button class="tab" onclick="switchTab('info',this)">Ayuda</button>
@@ -309,7 +310,23 @@
     </div>
   </div>
 
-  <div id="tab-historial" class="panel">
+  <div id="tab-buscar" class="panel">
+  <div style="font-size:15px;font-weight:600;margin-bottom:4px">Buscar por código</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Ingresa un código de artículo para ver en qué palets está y cuántas unidades hay.</div>
+  <div style="display:flex;gap:8px;margin-bottom:4px">
+    <div class="field" style="flex:1;margin-bottom:0">
+      <label>Código del artículo</label>
+      <input type="text" id="search-sku" placeholder="Ej: LAP-001" autocapitalize="characters" onkeydown="if(event.key==='Enter')searchByCodigo()"/>
+    </div>
+    <div style="display:flex;align-items:flex-end">
+      <button class="btn btn-primary" onclick="searchByCodigo()">Buscar</button>
+    </div>
+  </div>
+  <div class="msg msg-loading" id="search-loading" style="margin-bottom:12px"><div class="spinner"></div>Buscando...</div>
+  <div class="msg msg-error" id="search-error" style="margin-bottom:12px"></div>
+  <div id="search-results"></div>
+</div>
+<div id="tab-historial" class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
       <div style="font-size:15px;font-weight:600">Últimos movimientos</div>
       <button class="btn btn-sm" onclick="loadHistory()">Actualizar</button>
@@ -400,7 +417,9 @@ function initApp(){
   const rb=document.getElementById('topbar-rol-badge');
   rb.textContent=rolLabels[currentRol]||currentRol;
   rb.className='rol-badge '+(rolClasses[currentRol]||'');
-  if(currentRol==='lector') document.getElementById('excel-mode-btn').style.display='none';
+  if(currentRol==='lector'){
+    document.getElementById('excel-mode-btn').style.display='none';
+  }
   fetch(SCRIPT_URL+'?action=ping',{mode:'no-cors'}).then(()=>document.getElementById('conn-dot').style.background='#2d6a4f').catch(()=>document.getElementById('conn-dot').style.background='#991b1b');
   setTimeout(()=>document.getElementById('gun-input').focus(),400);
   setupGun();
@@ -934,6 +953,50 @@ async function deleteBodega(codigo){
     const data=await resp.json();
     if(data.ok){await loadBodegas();}
   }catch(e){}
+}
+
+
+// ===== BUSCAR POR CÓDIGO =====
+async function searchByCodigo(){
+  const sku=document.getElementById('search-sku').value.trim().toUpperCase();
+  if(!sku){document.getElementById('search-error').textContent='Ingresa un código para buscar.';showMsg('search-error',true);return;}
+  showMsg('search-loading',true);showMsg('search-error',false);
+  document.getElementById('search-results').innerHTML='';
+  try{
+    const resp=await fetch(SCRIPT_URL+'?action=searchCodigo&sku='+encodeURIComponent(sku));
+    const data=await resp.json();
+    showMsg('search-loading',false);
+    if(!data.results||data.results.length===0){
+      document.getElementById('search-results').innerHTML='<div class="empty-state">No se encontró el código <strong>'+sku+'</strong> en ningún palet.</div>';
+      return;
+    }
+    const total=data.results.reduce((s,r)=>s+r.qty,0);
+    let html=`<div style="margin-bottom:12px;padding:10px 14px;background:var(--green-bg);border-radius:var(--radius-sm);font-size:13px;color:var(--green-text)">
+      <strong>${data.name||sku}</strong> — encontrado en ${data.results.length} palet(s) · Total: <strong>${total} unidades</strong>
+    </div>`;
+    data.results.forEach(r=>{
+      const seriesHtml=r.series?r.series.split(',').map(s=>`<span class="series-tag">${s.trim()}</span>`).join(''):'<span style="color:var(--text3);font-size:12px">Sin series</span>';
+      html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600">${r.paletId}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">${r.loc}${r.bodega?' · '+r.bodega:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px;font-weight:600;color:var(--text)">${r.qty}</div>
+            <div style="font-size:11px;color:var(--text3)">unidades</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Series</div>
+        <div>${seriesHtml}</div>
+      </div>`;
+    });
+    document.getElementById('search-results').innerHTML=html;
+  }catch(e){
+    showMsg('search-loading',false);
+    document.getElementById('search-error').textContent='No se pudo conectar. Verifica el wifi.';
+    showMsg('search-error',true);
+  }
 }
 
 function showMsg(id,show){const el=document.getElementById(id);if(!el)return;el.style.display=show?(el.classList.contains('msg-loading')?'flex':'block'):'none';}
