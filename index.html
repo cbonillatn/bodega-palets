@@ -589,13 +589,14 @@ async function loadPalet(id){
   if(!id){document.getElementById('gun-input').focus();return;}
   showMsg('load-msg',true);showMsg('load-error',false);
   currentPalet=id;currentItems=[];originalItems=[];
+  let paletData=null;
   try{
     const resp=await fetch(SCRIPT_URL+'?action=getPalet&id='+encodeURIComponent(id));
-    const data=await resp.json();
-    if(data.found){
-      currentItems=data.items.map(i=>({...i}));
-      originalItems=data.items.map(i=>({...i}));
-      document.getElementById('palet-location').value=data.loc||'';
+    paletData=await resp.json();
+    if(paletData.found){
+      currentItems=paletData.items.map(i=>({...i}));
+      originalItems=paletData.items.map(i=>({...i}));
+      document.getElementById('palet-location').value=paletData.loc||'';
       setBadge('Registrado','badge-ok');
     }else{
       document.getElementById('palet-location').value='';
@@ -610,7 +611,7 @@ async function loadPalet(id){
   document.getElementById('palet-title').textContent=id;
   document.getElementById('palet-loc-display').textContent=document.getElementById('palet-location').value||'Ingresa la ubicación abajo';
   document.getElementById('op-name-display').textContent=currentUser;
-  if(data.found&&data.bodega){const sel=document.getElementById('palet-bodega');if(sel)sel.value=data.bodega||'';}
+  if(paletData&&paletData.found&&paletData.bodega){const sel=document.getElementById('palet-bodega');if(sel)sel.value=paletData.bodega||'';}
 
   const canEdit=currentRol==='admin'||currentRol==='editor';
   const isAdmin=currentRol==='admin';
@@ -857,7 +858,10 @@ function resetHome(){
 async function loadBodegas(){
   showMsg('bodegas-loading',true);
   const canManage=currentRol==='admin'||currentRol==='editor';
-  document.getElementById('add-bodega-btn').style.display=canManage?'inline-flex':'none';
+  const addBtn=document.getElementById('add-bodega-btn');
+  if(addBtn)addBtn.style.display=canManage?'inline-flex':'none';
+  const addForm=document.getElementById('add-bodega-form');
+  if(addForm&&!canManage)addForm.style.display='none';
   try{
     const resp=await fetch(SCRIPT_URL+'?action=getBodegas');
     bodegas=await resp.json();
@@ -894,6 +898,7 @@ function updateBodegaSelect(){
 }
 
 function showAddBodega(){
+  if(currentRol!=='admin'&&currentRol!=='editor'){return;}
   document.getElementById('add-bodega-form').style.display='block';
   document.getElementById('bodega-codigo').value='';
   document.getElementById('bodega-nombre').value='';
@@ -902,6 +907,7 @@ function showAddBodega(){
 }
 
 async function saveBodega(){
+  if(currentRol!=='admin'&&currentRol!=='editor'){return;}
   const codigo=document.getElementById('bodega-codigo').value.trim().toUpperCase();
   const nombre=document.getElementById('bodega-nombre').value.trim();
   if(!codigo||!nombre){document.getElementById('bodega-error').textContent='Ingresa código y nombre.';showMsg('bodega-error',true);return;}
@@ -921,6 +927,7 @@ async function saveBodega(){
 }
 
 async function deleteBodega(codigo){
+  if(currentRol!=='admin'&&currentRol!=='editor'){return;}
   if(!confirm('¿Eliminar la bodega '+codigo+'?'))return;
   try{
     const resp=await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'deleteBodega',codigo})});
