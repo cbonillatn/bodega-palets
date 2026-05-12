@@ -325,6 +325,23 @@
   <div class="msg msg-loading" id="search-loading" style="margin-bottom:12px"><div class="spinner"></div>Buscando...</div>
   <div class="msg msg-error" id="search-error" style="margin-bottom:12px"></div>
   <div id="search-results"></div>
+
+  <div style="height:1px;background:var(--border);margin:24px 0"></div>
+
+  <div style="font-size:15px;font-weight:600;margin-bottom:4px">Buscar por serie</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Ingresa un número de serie para saber en qué palet y artículo está registrado.</div>
+  <div style="display:flex;gap:8px;margin-bottom:4px">
+    <div class="field" style="flex:1;margin-bottom:0">
+      <label>Número de serie</label>
+      <input type="text" id="search-serie" placeholder="Ej: SN-20241" autocapitalize="characters" onkeydown="if(event.key==='Enter')searchBySerie()"/>
+    </div>
+    <div style="display:flex;align-items:flex-end">
+      <button class="btn btn-primary" onclick="searchBySerie()">Buscar</button>
+    </div>
+  </div>
+  <div class="msg msg-loading" id="search-serie-loading" style="margin-bottom:12px"><div class="spinner"></div>Buscando...</div>
+  <div class="msg msg-error" id="search-serie-error" style="margin-bottom:12px"></div>
+  <div id="search-serie-results"></div>
 </div>
 <div id="tab-historial" class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:13px">
@@ -955,6 +972,51 @@ async function deleteBodega(codigo){
   }catch(e){}
 }
 
+
+
+// ===== BUSCAR POR SERIE =====
+async function searchBySerie(){
+  const serie=document.getElementById('search-serie').value.trim().toUpperCase();
+  if(!serie){document.getElementById('search-serie-error').textContent='Ingresa un número de serie para buscar.';showMsg('search-serie-error',true);return;}
+  showMsg('search-serie-loading',true);showMsg('search-serie-error',false);
+  document.getElementById('search-serie-results').innerHTML='';
+  try{
+    const resp=await fetch(SCRIPT_URL+'?action=searchSerie&serie='+encodeURIComponent(serie));
+    const data=await resp.json();
+    showMsg('search-serie-loading',false);
+    if(!data.results||data.results.length===0){
+      document.getElementById('search-serie-results').innerHTML='<div class="empty-state">No se encontró la serie <strong>'+serie+'</strong> en ningún palet.</div>';
+      return;
+    }
+    let html='';
+    data.results.forEach(r=>{
+      const seriesHtml=r.series?r.series.split(',').map(s=>{
+        const trimmed=s.trim();
+        const isMatch=trimmed.toUpperCase()===serie;
+        return `<span class="series-tag" style="${isMatch?'background:#fde68a;color:#78350f;font-weight:600;':''}">${trimmed}</span>`;
+      }).join(''):'—';
+      html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600">${r.paletId}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">${r.loc}${r.bodega?' · '+r.bodega:''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)">${r.sku}</div>
+            <div style="font-size:13px;font-weight:500;color:var(--text);margin-top:2px">${r.name}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Series del artículo <span style="color:var(--amber-text)">(resaltada la buscada)</span></div>
+        <div>${seriesHtml}</div>
+      </div>`;
+    });
+    document.getElementById('search-serie-results').innerHTML=html;
+  }catch(e){
+    showMsg('search-serie-loading',false);
+    document.getElementById('search-serie-error').textContent='No se pudo conectar. Verifica el wifi.';
+    showMsg('search-serie-error',true);
+  }
+}
 
 // ===== BUSCAR POR CÓDIGO =====
 async function searchByCodigo(){
